@@ -10,13 +10,18 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#0a0e1a;color:#e2e8f0;font-family:sans-serif;padding:16px}
-h1{color:#60a5fa;font-size:22px;margin-bottom:16px}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+h1{color:#60a5fa;font-size:22px}
+.btn-settings{background:#1e293b;border:1px solid #334155;color:#a78bfa;padding:8px 14px;border-radius:10px;font-size:14px;cursor:pointer}
 .card{background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:14px;margin-bottom:12px}
 .total{font-size:28px;font-weight:700;color:#60a5fa}
 .sub{font-size:12px;color:#64748b;margin-top:4px}
 input,select{width:100%;background:#0a0e1a;border:1px solid #1e3a5f;color:#e2e8f0;padding:10px;border-radius:8px;font-size:14px;margin-bottom:10px}
-button{width:100%;background:#2563eb;border:none;color:#fff;padding:12px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer}
-.btn-del{background:#991b1b;width:auto;padding:4px 10px;font-size:12px;border-radius:6px}
+.btn{width:100%;border:none;color:#fff;padding:12px;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:6px}
+.btn-blue{background:#2563eb}
+.btn-purple{background:linear-gradient(135deg,#6d28d9,#4c1d95)}
+.btn-gray{background:#1e293b;color:#94a3b8}
+.btn-del{background:#991b1b;width:auto;padding:4px 10px;font-size:12px;border-radius:6px;border:none;color:#fff;cursor:pointer}
 table{width:100%;border-collapse:collapse;margin-top:8px}
 td,th{padding:8px;font-size:13px;border-bottom:1px solid #1e293b;text-align:left}
 th{color:#60a5fa;font-size:11px}
@@ -25,54 +30,115 @@ th{color:#60a5fa;font-size:11px}
 label{font-size:11px;color:#94a3b8;display:block;margin-bottom:4px}
 .row{display:flex;gap:10px}
 .row>div{flex:1}
+.settings-box{background:#0f172a;border:1px solid #a78bfa44;border-radius:12px;padding:14px;margin-bottom:12px}
+.settings-title{font-size:14px;font-weight:700;color:#a78bfa;margin-bottom:4px}
+.settings-sub{font-size:12px;color:#64748b;margin-bottom:14px}
+.rate-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.periods{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:none}
+.period-btn{flex-shrink:0;border:none;padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;background:#1e293b;color:#94a3b8;white-space:nowrap}
+.period-btn.active{background:#2563eb;color:#fff}
+.period-card{background:#0f172a;border:1px solid #1e3a5f33;border-radius:10px;padding:12px;margin-bottom:8px}
+.period-range{font-size:13px;font-weight:700;color:#e2e8f0}
+.period-meta{font-size:11px;color:#64748b;margin-top:3px}
+.period-amount{font-size:18px;font-weight:700;color:#60a5fa}
 input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6)}
 select option{background:#0f172a}
+.hidden{display:none}
+.tab-row{display:flex;gap:4px;margin-bottom:12px}
+.tab-btn{flex:1;border:none;padding:8px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#1e293b;color:#94a3b8}
+.tab-btn.active{background:#1e3a5f;color:#60a5fa}
 </style>
 </head>
 <body>
-<h1>🕐 OT Tracker</h1>
 
-<div class="card" id="total-card">
-  <div class="sub">รายได้รวม</div>
-  <div class="total" id="total-display">฿0</div>
-  <div class="sub" id="sub-display"></div>
+<div class="header">
+  <h1>🕐 OT Tracker</h1>
+  <button class="btn-settings" onclick="toggleSettings()">⚙️ ตั้งค่า</button>
 </div>
 
-<div class="card">
-  <label>วันที่</label>
-  <input type="date" id="f-date">
-  <div class="row">
-    <div>
-      <label>กะ</label>
-      <select id="f-shift">
-        <option value="day">🌤 กะเช้า</option>
-        <option value="night">🌙 กะดึก (+฿265)</option>
-      </select>
-    </div>
-    <div>
-      <label>ชม.โอที</label>
-      <input type="number" id="f-hours" min="0" step="0.5" placeholder="0">
-    </div>
+<!-- Settings -->
+
+<div class="settings-box hidden" id="settings-panel">
+  <div class="settings-title">⚙️ ตั้งค่าอัตราโอที</div>
+  <div class="settings-sub">ปรับได้เมื่อเงินเดือนขึ้น · ตัดวิกทุกวันที่ 15</div>
+  <div class="rate-grid">
+    <div><label style="color:#fbbf24">🌤 กะเช้า (บาท/ชม.)</label><input type="number" id="s-day"></div>
+    <div><label style="color:#a78bfa">🌙 กะดึก (บาท/ชม.)</label><input type="number" id="s-night"></div>
+    <div><label style="color:#34d399">🏖 วันหยุด ≤8ชม.</label><input type="number" id="s-holiday"></div>
+    <div><label style="color:#f87171">🏖 วันหยุด >8ชม.</label><input type="number" id="s-holidayOT"></div>
+    <div style="grid-column:1/-1"><label style="color:#a78bfa">🌙 ค่ากะดึก (บาท/กะ)</label><input type="number" id="s-allowance"></div>
   </div>
-  <label>ประเภทวัน</label>
-  <select id="f-type">
-    <option value="weekday">วันธรรมดา (฿121/ชม.)</option>
-    <option value="holiday">วันหยุด (฿161/ชม. / >8ชม.฿242)</option>
-  </select>
-  <button onclick="addEntry()">✅ บันทึกโอที</button>
+  <button class="btn btn-purple" onclick="saveSettings()">💾 บันทึกอัตราใหม่</button>
+  <button class="btn btn-gray" onclick="toggleSettings()">ยกเลิก</button>
 </div>
 
-<div class="card">
-  <table>
-    <thead>
-      <tr><th>วันที่</th><th>กะ</th><th>ชม.</th><th>ค่าโอที</th><th>ค่ากะ</th><th></th></tr>
-    </thead>
-    <tbody id="entry-list"></tbody>
-  </table>
+<!-- Tabs -->
+
+<div class="tab-row">
+  <button class="tab-btn active" id="tab-summary" onclick="switchTab('summary')">📊 สรุปรอบ</button>
+  <button class="tab-btn" id="tab-add" onclick="switchTab('add')">➕ บันทึก</button>
+  <button class="tab-btn" id="tab-list" onclick="switchTab('list')">📋 รายการ</button>
+</div>
+
+<!-- Summary -->
+
+<div id="view-summary">
+  <div class="card">
+    <div class="sub">รายได้รวม</div>
+    <div class="total" id="total-display">฿0</div>
+    <div class="sub" id="sub-display"></div>
+  </div>
+  <div class="periods" id="period-list"></div>
+  <div id="period-breakdown"></div>
+</div>
+
+<!-- Add -->
+
+<div id="view-add" class="hidden">
+  <div class="card">
+    <label>วันที่</label>
+    <input type="date" id="f-date">
+    <div class="row">
+      <div><label>กะ</label>
+        <select id="f-shift">
+          <option value="day">🌤 กะเช้า</option>
+          <option value="night">🌙 กะดึก</option>
+        </select>
+      </div>
+      <div><label>ชม.โอที</label>
+        <input type="number" id="f-hours" min="0" step="0.5" placeholder="0">
+      </div>
+    </div>
+    <label>ประเภทวัน</label>
+    <select id="f-type">
+      <option value="weekday">📅 วันธรรมดา</option>
+      <option value="holiday">🏖 วันหยุด</option>
+    </select>
+    <div id="preview-box" style="background:#0a0e1a;border:1px solid #1e293b;border-radius:8px;padding:10px;margin-bottom:10px;font-size:13px;display:none">
+      <div style="color:#64748b;margin-bottom:6px">ยอดที่จะได้รับ</div>
+      <div style="display:flex;justify-content:space-between;color:#94a3b8"><span>ค่าโอที</span><span id="prev-ot">฿0</span></div>
+      <div id="prev-night-row" style="display:none;justify-content:space-between;color:#a78bfa;margin-top:3px"><span>🌙 ค่ากะ</span><span id="prev-night">฿0</span></div>
+      <div style="display:flex;justify-content:space-between;font-weight:700;color:#60a5fa;margin-top:8px;padding-top:8px;border-top:1px solid #1e293b"><span>รวม</span><span id="prev-total">฿0</span></div>
+    </div>
+    <button class="btn btn-blue" onclick="addEntry()">✅ บันทึกโอที</button>
+  </div>
+</div>
+
+<!-- List -->
+
+<div id="view-list" class="hidden">
+  <div class="card">
+    <table>
+      <thead><tr><th>วันที่</th><th>กะ</th><th>ชม.</th><th>ค่าโอที</th><th>ค่ากะ</th><th></th></tr></thead>
+      <tbody id="entry-list"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
-var MONTHS = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+var M = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+var currentTab = "summary";
+var currentPeriod = "all";
 
 var INIT = [
   {id:1,date:"2026-04-18",shift:"day",hours:8,type:"holiday"},
@@ -92,77 +158,199 @@ var INIT = [
   {id:15,date:"2026-05-06",shift:"night",hours:2,type:"weekday"}
 ];
 
-function loadEntries() {
-  try {
-    var v = localStorage.getItem("ot2");
-    return v ? JSON.parse(v) : INIT;
-  } catch(e) { return INIT; }
+var DEF = {dayRate:121,nightRate:161,holidayRate:161,holidayOTRate:242,nightAllowance:265};
+
+function loadE(){try{var v=localStorage.getItem("ot2");return v?JSON.parse(v):INIT;}catch(e){return INIT;}}
+function saveE(e){try{localStorage.setItem("ot2",JSON.stringify(e));}catch(x){}}
+function loadR(){try{var v=localStorage.getItem("ot_rates2");return v?JSON.parse(v):DEF;}catch(e){return DEF;}}
+function saveR(r){try{localStorage.setItem("ot_rates2",JSON.stringify(r));}catch(e){}}
+
+// รอบตัดวิก: key = "YYYY-MM" ของเดือนที่จ่าย
+function getPK(date){
+  var d=new Date(date),day=d.getDate(),m=d.getMonth(),y=d.getFullYear();
+  if(day<=15) return y+"-"+String(m+1).padStart(2,"0");
+  var n=new Date(y,m+1,1);
+  return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0");
 }
 
-function saveEntries(entries) {
-  try { localStorage.setItem("ot2", JSON.stringify(entries)); } catch(e) {}
+// Label แบบ "16 เม.ย. – 15 พ.ค."
+function getPeriodLabel(key){
+  var parts=key.split("-");
+  var y=parseInt(parts[0]),m=parseInt(parts[1])-1; // m = เดือนที่จ่าย (0-indexed)
+  // เริ่ม = 16 เดือนก่อน
+  var startM = m-1; var startY = y;
+  if(startM<0){startM=11;startY--;}
+  var startStr = "16 "+M[startM];
+  var endStr = "15 "+M[m];
+  return startStr+" – "+endStr;
 }
 
-function calcOT(hours, shift, type) {
-  if (type === "holiday") {
-    return Math.min(hours, 8) * 161 + Math.max(hours - 8, 0) * 242;
-  }
-  return shift === "day" ? hours * 121 : hours * 161;
+// Short label for pill
+function getPillLabel(key){
+  var parts=key.split("-");
+  var m=parseInt(parts[1])-1;
+  return M[m];
 }
 
-function fmtDate(s) {
-  var d = new Date(s);
-  return d.getDate() + " " + MONTHS[d.getMonth()];
+function calcOT(hours,shift,type){
+  var r=loadR();
+  if(type==="holiday") return Math.min(hours,8)*r.holidayRate+Math.max(hours-8,0)*r.holidayOTRate;
+  return shift==="day"?hours*r.dayRate:hours*r.nightRate;
 }
 
-function render() {
-  var entries = loadEntries();
-  var totalOT = 0, totalNight = 0;
+function fmtDate(s){var d=new Date(s);return d.getDate()+" "+M[d.getMonth()];}
 
-  var html = "";
-  entries.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); }).forEach(function(e) {
-    var ot = calcOT(e.hours, e.shift, e.type);
-    var na = e.shift === "night" ? 265 : 0;
-    totalOT += ot;
-    totalNight += na;
-    html += "<tr>" +
-      "<td>" + fmtDate(e.date) + "</td>" +
-      "<td class='" + e.shift + "'>" + (e.shift==="day"?"🌤 เช้า":"🌙 ดึก") + "</td>" +
-      "<td>" + e.hours + "</td>" +
-      "<td>" + (ot>0 ? "฿"+ot.toFixed(2) : "–") + "</td>" +
-      "<td>" + (na>0 ? "฿"+na : "–") + "</td>" +
-      "<td><button class='btn-del' onclick='delEntry("+e.id+")'>ลบ</button></td>" +
-      "</tr>";
+function switchTab(tab){
+  currentTab=tab;
+  ["summary","add","list"].forEach(function(t){
+    document.getElementById("view-"+t).classList.add("hidden");
+    document.getElementById("tab-"+t).classList.remove("active");
   });
-
-  document.getElementById("entry-list").innerHTML = html;
-  document.getElementById("total-display").textContent = "฿" + (totalOT + totalNight).toLocaleString("th-TH", {minimumFractionDigits:2});
-  document.getElementById("sub-display").textContent = "โอที ฿" + totalOT.toFixed(2) + " + ค่ากะดึก ฿" + totalNight;
-}
-
-function addEntry() {
-  var date = document.getElementById("f-date").value;
-  var shift = document.getElementById("f-shift").value;
-  var hours = parseFloat(document.getElementById("f-hours").value) || 0;
-  var type = document.getElementById("f-type").value;
-
-  if (!date) { alert("กรุณาเลือกวันที่"); return; }
-
-  var entries = loadEntries();
-  entries.push({id: Date.now(), date: date, shift: shift, hours: hours, type: type});
-  saveEntries(entries);
-
-  document.getElementById("f-date").value = "";
-  document.getElementById("f-hours").value = "";
+  document.getElementById("view-"+tab).classList.remove("hidden");
+  document.getElementById("tab-"+tab).classList.add("active");
   render();
 }
 
-function delEntry(id) {
-  if (!confirm("ลบรายการนี้?")) return;
-  var entries = loadEntries().filter(function(e){ return e.id !== id; });
-  saveEntries(entries);
+function toggleSettings(){
+  var p=document.getElementById("settings-panel");
+  if(p.classList.contains("hidden")){
+    var r=loadR();
+    document.getElementById("s-day").value=r.dayRate;
+    document.getElementById("s-night").value=r.nightRate;
+    document.getElementById("s-holiday").value=r.holidayRate;
+    document.getElementById("s-holidayOT").value=r.holidayOTRate;
+    document.getElementById("s-allowance").value=r.nightAllowance;
+    p.classList.remove("hidden");
+  } else { p.classList.add("hidden"); }
+}
+
+function saveSettings(){
+  var r={
+    dayRate:parseFloat(document.getElementById("s-day").value)||121,
+    nightRate:parseFloat(document.getElementById("s-night").value)||161,
+    holidayRate:parseFloat(document.getElementById("s-holiday").value)||161,
+    holidayOTRate:parseFloat(document.getElementById("s-holidayOT").value)||242,
+    nightAllowance:parseFloat(document.getElementById("s-allowance").value)||265
+  };
+  saveR(r);
+  document.getElementById("settings-panel").classList.add("hidden");
+  render();
+  alert("บันทึกอัตราใหม่แล้ว ✅");
+}
+
+function updatePreview(){
+  var hours=parseFloat(document.getElementById("f-hours").value)||0;
+  var shift=document.getElementById("f-shift").value;
+  var type=document.getElementById("f-type").value;
+  var date=document.getElementById("f-date").value;
+  var r=loadR();
+  var ot=calcOT(hours,shift,type);
+  var na=shift==="night"?r.nightAllowance:0;
+  document.getElementById("prev-ot").textContent="฿"+ot.toFixed(2);
+  document.getElementById("prev-night").textContent="฿"+na;
+  document.getElementById("prev-night-row").style.display=shift==="night"?"flex":"none";
+  document.getElementById("prev-total").textContent="฿"+(ot+na).toFixed(2);
+  document.getElementById("preview-box").style.display=date?"block":"none";
+}
+
+function render(){
+  var entries=loadE();
+  var r=loadR();
+
+  // unique periods sorted
+  var pMap={};
+  entries.forEach(function(e){ pMap[getPK(e.date)]=true; });
+  var periods=Object.keys(pMap).sort();
+
+  var filtered=currentPeriod==="all"?entries:entries.filter(function(e){return getPK(e.date)===currentPeriod;});
+  var totalOT=filtered.reduce(function(s,e){return s+calcOT(e.hours,e.shift,e.type);},0);
+  var nightCount=filtered.filter(function(e){return e.shift==="night";}).length;
+  var totalNight=nightCount*r.nightAllowance;
+  var grand=totalOT+totalNight;
+
+  if(currentTab==="summary"){
+    document.getElementById("total-display").textContent="฿"+grand.toLocaleString("th-TH",{minimumFractionDigits:2});
+    document.getElementById("sub-display").textContent="โอที ฿"+totalOT.toFixed(2)+" + ค่ากะดึก ฿"+totalNight+" · "+filtered.length+" รายการ";
+
+    // Pills
+    var pillHtml="<button class='period-btn "+(currentPeriod==="all"?"active":"")+"' onclick=\"setPeriod('all')\">ทั้งหมด</button>";
+    periods.forEach(function(k){
+      pillHtml+="<button class='period-btn "+(currentPeriod===k?"active":"")+"' onclick=\"setPeriod('"+k+"')\">"+getPillLabel(k)+"</button>";
+    });
+    document.getElementById("period-list").innerHTML=pillHtml;
+
+    // Breakdown
+    var bHtml="";
+    if(currentPeriod==="all"){
+      periods.forEach(function(k){
+        var pe=entries.filter(function(e){return getPK(e.date)===k;});
+        var pot=pe.reduce(function(s,e){return s+calcOT(e.hours,e.shift,e.type);},0);
+        var pnc=pe.filter(function(e){return e.shift==="night";}).length;
+        var pna=pnc*r.nightAllowance;
+        bHtml+="<div class='period-card'>"+
+          "<div style='display:flex;justify-content:space-between;align-items:center'>"+
+          "<div>"+
+          "<div class='period-range'>รอบ "+getPeriodLabel(k)+"</div>"+
+          "<div class='period-meta'>"+pe.reduce(function(s,e){return s+e.hours;},0)+" ชม. · "+pe.length+" รายการ · "+pnc+" กะดึก</div>"+
+          "<div style='font-size:11px;color:#64748b;margin-top:2px'>โอที ฿"+pot.toFixed(0)+(pna>0?" + ค่ากะ ฿"+pna:"")+"</div>"+
+          "</div>"+
+          "<div class='period-amount'>฿"+(pot+pna).toLocaleString("th-TH",{minimumFractionDigits:0})+"</div>"+
+          "</div></div>";
+      });
+    } else {
+      // Show selected period detail
+      var selLabel = getPeriodLabel(currentPeriod);
+      bHtml="<div style='font-size:12px;color:#60a5fa;margin-bottom:8px'>รอบ "+selLabel+"</div>";
+    }
+    document.getElementById("period-breakdown").innerHTML=bHtml;
+  }
+
+  if(currentTab==="list"){
+    var html="";
+    filtered.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).forEach(function(e){
+      var ot=calcOT(e.hours,e.shift,e.type);
+      var na=e.shift==="night"?r.nightAllowance:0;
+      html+="<tr>"+
+        "<td>"+fmtDate(e.date)+"</td>"+
+        "<td class='"+e.shift+"'>"+(e.shift==="day"?"🌤":"🌙")+"</td>"+
+        "<td>"+e.hours+"</td>"+
+        "<td>"+(ot>0?"฿"+ot.toFixed(2):"–")+"</td>"+
+        "<td>"+(na>0?"฿"+na:"–")+"</td>"+
+        "<td><button class='btn-del' onclick='delEntry("+e.id+")'>ลบ</button></td>"+
+        "</tr>";
+    });
+    document.getElementById("entry-list").innerHTML=html||"<tr><td colspan='6' style='text-align:center;color:#475569;padding:20px'>ยังไม่มีรายการ</td></tr>";
+  }
+}
+
+function setPeriod(p){currentPeriod=p;render();}
+
+function addEntry(){
+  var date=document.getElementById("f-date").value;
+  var shift=document.getElementById("f-shift").value;
+  var hours=parseFloat(document.getElementById("f-hours").value)||0;
+  var type=document.getElementById("f-type").value;
+  if(!date){alert("กรุณาเลือกวันที่");return;}
+  var entries=loadE();
+  entries.push({id:Date.now(),date:date,shift:shift,hours:hours,type:type});
+  saveE(entries);
+  document.getElementById("f-date").value="";
+  document.getElementById("f-hours").value="";
+  document.getElementById("preview-box").style.display="none";
+  alert("บันทึกแล้ว ✅");
+  switchTab("summary");
+}
+
+function delEntry(id){
+  if(!confirm("ลบรายการนี้?"))return;
+  saveE(loadE().filter(function(e){return e.id!==id;}));
   render();
 }
+
+["f-date","f-shift","f-hours","f-type"].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener("change",updatePreview);
+});
 
 render();
 </script>
