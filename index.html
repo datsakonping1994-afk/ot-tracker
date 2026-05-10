@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="OT Tracker"/>
+<meta name="theme-color" content="#0a0e1a"/>
+<title>OT Tracker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;color:#e2e8f0;font-family:'Sarabun','Noto Sans Thai',sans-serif;min-height:100vh}
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useEffect } = React;
+
+const MONTHS_TH = [“ม.ค.”,“ก.พ.”,“มี.ค.”,“เม.ย.”,“พ.ค.”,“มิ.ย.”,“ก.ค.”,“ส.ค.”,“ก.ย.”,“ต.ค.”,“พ.ย.”,“ธ.ค.”];
+const DEFAULT_RATES = { nightAllowance:265, dayRate:121, nightRate:161, holidayRate:161, holidayOTRate:242 };
+
+const initialEntries = [
+{id:1,date:“2026-04-18”,shift:“day”,hours:8,isHoliday:true},
+{id:2,date:“2026-04-19”,shift:“night”,hours:10,isHoliday:true},
+{id:3,date:“2026-04-20”,shift:“night”,hours:0,isHoliday:false},
+{id:4,date:“2026-04-21”,shift:“night”,hours:0,isHoliday:false},
+{id:5,date:“2026-04-22”,shift:“night”,hours:1.5,isHoliday:false},
+{id:6,date:“2026-04-23”,shift:“night”,hours:2,isHoliday:false},
+{id:7,date:“2026-04-24”,shift:“night”,hours:2,isHoliday:false},
+{id:8,date:“2026-04-25”,shift:“night”,hours:1.5,isHoliday:false},
+{id:9,date:“2026-04-27”,shift:“day”,hours:2.5,isHoliday:false},
+{id:10,date:“2026-04-28”,shift:“day”,hours:2,isHoliday:false},
+{id:11,date:“2026-04-29”,shift:“day”,hours:2.5,isHoliday:false},
+{id:12,date:“2026-04-30”,shift:“day”,hours:3,isHoliday:false},
+{id:13,date:“2026-05-04”,shift:“night”,hours:10.5,isHoliday:true},
+{id:14,date:“2026-05-05”,shift:“night”,hours:2,isHoliday:false},
+{id:15,date:“2026-05-06”,shift:“night”,hours:2,isHoliday:false},
+];
+
+function calcOT(hours,shift,isHoliday,rates){
+if(isHoliday){
+return Math.min(hours,8)*rates.holidayRate + Math.max(hours-8,0)*rates.holidayOTRate;
+}
+return shift===“day” ? hours*rates.dayRate : hours*rates.nightRate;
+}
+function calcTotal(e,rates){ return calcOT(e.hours,e.shift,e.isHoliday,rates)+(e.shift===“night”?rates.nightAllowance:0); }
+function getPeriodKey(date){
+const d=new Date(date),day=d.getDate(),m=d.getMonth(),y=d.getFullYear();
+if(day<=15) return `${y}-${String(m+1).padStart(2,"0")}`;
+const n=new Date(y,m+1,1);
+return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}`;
+}
+function getPeriodLabel(date){
+const d=new Date(date),day=d.getDate(),m=d.getMonth(),y=d.getFullYear();
+if(day<=15) return `${MONTHS_TH[m]} ${y+543}`;
+const n=new Date(y,m+1,1);
+return `${MONTHS_TH[n.getMonth()]} ${n.getFullYear()+543}`;
+}
+function fmtDate(s){ const d=new Date(s); return `${d.getDate()} ${MONTHS_TH[d.getMonth()]}`; }
+
+const S = {
+inp:{width:“100%”,background:”#0a0e1a”,border:“1px solid #1e3a5f”,color:”#e2e8f0”,padding:“10px 12px”,borderRadius:10,fontFamily:“inherit”,fontSize:14},
+};
+
+function App(){
+const [entries,setEntries] = useState(()=>{ try{ const v=localStorage.getItem(“ot_e”); return v?JSON.parse(v):initialEntries; }catch{ return initialEntries; }});
+const [rates,setRates] = useState(()=>{ try{ const v=localStorage.getItem(“ot_r”); return v?JSON.parse(v):DEFAULT_RATES; }catch{ return DEFAULT_RATES; }});
+const [showForm,setShowForm] = useState(false);
+const [showSettings,setShowSettings] = useState(false);
+const [tempRates,setTempRates] = useState(DEFAULT_RATES);
+const [form,setForm] = useState({date:””,shift:“day”,hours:””,isHoliday:false});
+const [editId,setEditId] = useState(null);
+const [deleteId,setDeleteId] = useState(null);
+const [tab,setTab] = useState(“dashboard”);
+const [period,setPeriod] = useState(“all”);
+
+function saveEntries(next){ setEntries(next); try{localStorage.setItem(“ot_e”,JSON.stringify(next));}catch{} }
+function saveRates(next){ setRates(next); try{localStorage.setItem(“ot_r”,JSON.stringify(next));}catch{} }
+
+const periods = useMemo(()=>{
+const keys=[…new Set(entries.map(e=>getPeriodKey(e.date)))].sort();
+return keys.map(k=>({key:k,label:getPeriodLabel(entries.find(e=>getPeriodKey(e.date)===k).date)}));
+},[entries]);
+
+const filtered = useMemo(()=>period===“all”?entries:entries.filter(e=>getPeriodKey(e.date)===period),[entries,period]);
+
+const totalHours=filtered.reduce((s,e)=>s+e.hours,0);
+const totalOT=filtered.reduce((s,e)=>s+calcOT(e.hours,e.shift,e.isHoliday,rates),0);
+const nightCount=filtered.filter(e=>e.shift===“night”).length;
+const totalNightAll=nightCount*rates.nightAllowance;
+const grandTotal=totalOT+totalNightAll;
+const dayHrs=filtered.filter(e=>e.shift===“day”).reduce((s,e)=>s+e.hours,0);
+const nightHrs=filtered.filter(e=>e.shift===“night”).reduce((s,e)=>s+e.hours,0);
+const dayPay=filtered.filter(e=>e.shift===“day”).reduce((s,e)=>s+calcTotal(e,rates),0);
+const nightPay=filtered.filter(e=>e.shift===“night”).reduce((s,e)=>s+calcTotal(e,rates),0);
+
+const byDate=useMemo(()=>{
+const map={};
+[…filtered].sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(e=>{
+if(!map[e.date])map[e.date]=[];map[e.date].push(e);
+});
+return Object.entries(map);
+},[filtered]);
+
+function submit(){
+if(!form.date)return;
+const entry={…form,hours:parseFloat(form.hours)||0};
+let next;
+if(editId!==null){next=entries.map(e=>e.id===editId?{…entry,id:editId}:e);setEditId(null);}
+else{next=[…entries,{…entry,id:Date.now()}];}
+saveEntries(next);
+setForm({date:””,shift:“day”,hours:””,isHoliday:false});
+setShowForm(false);
+}
+
+const previewOT=calcOT(parseFloat(form.hours)||0,form.shift,form.isHoliday,rates);
+const previewTotal=previewOT+(form.shift===“night”?rates.nightAllowance:0);
+
+const headerStyle={background:“linear-gradient(135deg,#0f172a,#1e293b)”,borderBottom:“1px solid #1e3a5f”,padding:“18px 16px 0”,position:“sticky”,top:0,zIndex:100};
+
+return (
+<div style={{minHeight:“100vh”,background:”#0a0e1a”,fontFamily:”‘Sarabun’,‘Noto Sans Thai’,sans-serif”,color:”#e2e8f0”}}>
+<style>{`@keyframes sd{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}} input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6)} select option{background:#0f172a} ::-webkit-scrollbar{display:none} button{cursor:pointer;font-family:inherit}`}</style>
+
+```
+  {/* HEADER */}
+  <div style={headerStyle}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <div>
+        <div style={{fontSize:10,color:"#60a5fa",letterSpacing:3,textTransform:"uppercase",marginBottom:2}}>ระบบบันทึก</div>
+        <div style={{fontSize:22,fontWeight:700}}>โอที <span style={{color:"#60a5fa"}}>Tracker</span></div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button onClick={()=>{setTempRates({...rates});setShowSettings(!showSettings);setShowForm(false);}}
+          style={{background:showSettings?"#2d1f5e":"#1e293b",border:"1px solid #334155",color:"#a78bfa",padding:"9px 14px",borderRadius:12,fontSize:13}}>⚙️</button>
+        <button onClick={()=>{setShowForm(!showForm);setEditId(null);setForm({date:"",shift:"day",hours:"",isHoliday:false});setShowSettings(false);setTab("list");}}
+          style={{background:showForm?"#1e3a5f":"linear-gradient(135deg,#2563eb,#1d4ed8)",border:"none",color:"#fff",padding:"9px 16px",borderRadius:12,fontSize:13,fontWeight:600,display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontSize:16}}>{showForm?"✕":"+"}</span>{showForm?"ยกเลิก":"บันทึกโอที"}
+        </button>
+      </div>
+    </div>
+    <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8}}>
+      {[{key:"all",label:"ทั้งหมด"},...periods].map(p=>(
+        <button key={p.key} onClick={()=>setPeriod(p.key)}
+          style={{flexShrink:0,background:period===p.key?"#2563eb":"#1e293b",border:"none",color:period===p.key?"#fff":"#94a3b8",padding:"5px 14px",borderRadius:20,fontSize:12,fontWeight:600}}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+    <div style={{display:"flex",gap:2}}>
+      {[["dashboard","📊 สรุป"],["list","📋 รายวัน"],["table","📄 ตาราง"]].map(([t,l])=>(
+        <button key={t} onClick={()=>setTab(t)}
+          style={{background:tab===t?"#1e3a5f":"transparent",border:"none",borderBottom:tab===t?"2px solid #60a5fa":"2px solid transparent",color:tab===t?"#60a5fa":"#94a3b8",padding:"9px 14px",fontSize:13,fontWeight:600,borderRadius:"8px 8px 0 0"}}>
+          {l}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <div style={{padding:"18px 14px",maxWidth:680,margin:"0 auto"}}>
+
+    {/* SETTINGS */}
+    {showSettings&&(
+      <div style={{background:"linear-gradient(135deg,#1a0f3a,#0f172a)",border:"1px solid #a78bfa44",borderRadius:16,padding:18,marginBottom:18,animation:"sd 0.3s ease"}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:4,color:"#a78bfa"}}>⚙️ ตั้งค่าอัตราโอที</div>
+        <div style={{fontSize:12,color:"#64748b",marginBottom:14}}>ปรับได้เมื่อเงินเดือนขึ้น</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[{k:"dayRate",l:"🌤 กะเช้า (บาท/ชม.)",c:"#fbbf24"},{k:"nightRate",l:"🌙 กะดึก (บาท/ชม.)",c:"#a78bfa"},
+            {k:"holidayRate",l:"🏖 วันหยุด ≤8ชม.",c:"#34d399"},{k:"holidayOTRate",l:"🏖 วันหยุด >8ชม.",c:"#f87171"},
+            {k:"nightAllowance",l:"🌙 ค่ากะดึก (บาท/กะ)",c:"#a78bfa"}].map(({k,l,c})=>(
+            <div key={k} style={{gridColumn:k==="nightAllowance"?"1/-1":"auto"}}>
+              <label style={{fontSize:11,color:c,display:"block",marginBottom:4}}>{l}</label>
+              <input type="number" value={tempRates[k]} onChange={e=>setTempRates({...tempRates,[k]:parseFloat(e.target.value)||0})}
+                style={{...S.inp,textAlign:"right"}}/>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:10,marginTop:14}}>
+          <button onClick={()=>setShowSettings(false)} style={{flex:1,background:"#1e293b",border:"none",color:"#94a3b8",padding:11,borderRadius:10,fontSize:13}}>ยกเลิก</button>
+          <button onClick={()=>{saveRates(tempRates);setShowSettings(false);}} style={{flex:2,background:"linear-gradient(135deg,#6d28d9,#4c1d95)",border:"none",color:"#fff",padding:11,borderRadius:10,fontSize:14,fontWeight:700}}>💾 บันทึกอัตราใหม่</button>
+        </div>
+      </div>
+    )}
+
+    {/* FORM */}
+    {showForm&&(
+      <div style={{background:"linear-gradient(135deg,#0f2044,#0f172a)",border:"1px solid #1e3a5f",borderRadius:16,padding:18,marginBottom:18,animation:"sd 0.3s ease"}}>
+        <div style={{fontSize:14,fontWeight:700,marginBottom:14,color:"#60a5fa"}}>{editId?"✏️ แก้ไขรายการ":"➕ เพิ่มรายการโอที"}</div>
+        {form.shift==="night"&&<div style={{background:"#1e104088",border:"1px solid #a78bfa44",borderRadius:10,padding:"8px 12px",marginBottom:12,fontSize:12,color:"#a78bfa"}}>🌙 กะดึก — ได้ค่ากะเพิ่ม <b>฿{rates.nightAllowance}</b>/กะ</div>}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          <div><label style={{fontSize:11,color:"#94a3b8",display:"block",marginBottom:4}}>วันที่</label>
+            <input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} style={S.inp}/></div>
+          <div><label style={{fontSize:11,color:"#94a3b8",display:"block",marginBottom:4}}>กะ</label>
+            <select value={form.shift} onChange={e=>setForm({...form,shift:e.target.value})} style={S.inp}>
+              <option value="day">🌤 กะเช้า</option>
+              <option value="night">🌙 กะดึก (+฿{rates.nightAllowance})</option>
+            </select></div>
+          <div><label style={{fontSize:11,color:"#94a3b8",display:"block",marginBottom:4}}>ชั่วโมงโอที</label>
+            <input type="number" min="0" step="0.5" value={form.hours} onChange={e=>setForm({...form,hours:e.target.value})} placeholder="0" style={S.inp}/></div>
+          <div><label style={{fontSize:11,color:"#94a3b8",display:"block",marginBottom:4}}>ประเภทวัน</label>
+            <button onClick={()=>setForm({...form,isHoliday:!form.isHoliday})}
+              style={{width:"100%",background:form.isHoliday?"#0d3b2e":"#0a0e1a",border:`1px solid ${form.isHoliday?"#34d399":"#1e3a5f"}`,color:form.isHoliday?"#34d399":"#64748b",padding:"10px 12px",borderRadius:10,fontSize:13,fontWeight:600,textAlign:"left"}}>
+              {form.isHoliday?"🏖 วันหยุด ✓":"📅 วันธรรมดา"}
+            </button></div>
+        </div>
+        {form.date&&(
+          <div style={{background:"#0a0e1a",border:"1px solid #1e293b",borderRadius:10,padding:"10px 14px",marginTop:10,fontSize:12}}>
+            <div style={{color:"#64748b",marginBottom:6}}>ยอดที่จะได้รับ</div>
+            <div style={{display:"flex",justifyContent:"space-between",color:"#94a3b8"}}><span>ค่าโอที</span><span>฿{previewOT.toFixed(2)}</span></div>
+            {form.shift==="night"&&<div style={{display:"flex",justifyContent:"space-between",color:"#a78bfa",marginTop:3}}><span>🌙 ค่ากะดึก</span><span>฿{rates.nightAllowance}</span></div>}
+            <div style={{display:"flex",justifyContent:"space-between",fontWeight:700,color:"#60a5fa",marginTop:8,paddingTop:8,borderTop:"1px solid #1e293b"}}><span>รวม</span><span>฿{previewTotal.toFixed(2)}</span></div>
+          </div>
+        )}
+        <button onClick={submit} style={{width:"100%",marginTop:14,background:"linear-gradient(135deg,#2563eb,#1d4ed8)",border:"none",color:"#fff",padding:"12px",borderRadius:10,fontSize:14,fontWeight:700}}>
+          {editId?"💾 บันทึกการแก้ไข":"✅ เพิ่มรายการ"}
+        </button>
+      </div>
+    )}
+
+    {/* DASHBOARD */}
+    {tab==="dashboard"&&(<>
+      <div style={{background:"linear-gradient(135deg,#1e3a5f,#0f2044)",border:"1px solid #1e40af44",borderRadius:16,padding:20,marginBottom:14}}>
+        <div style={{fontSize:11,color:"#94a3b8",marginBottom:5,letterSpacing:1}}>รายได้รวมทั้งหมด</div>
+        <div style={{fontSize:34,fontWeight:700,color:"#60a5fa"}}>฿{grandTotal.toLocaleString("th-TH",{minimumFractionDigits:2})}</div>
+        <div style={{display:"flex",gap:16,marginTop:8,flexWrap:"wrap"}}>
+          <span style={{fontSize:12,color:"#64748b"}}>โอที ฿{totalOT.toLocaleString("th-TH",{minimumFractionDigits:2})}</span>
+          {totalNightAll>0&&<span style={{fontSize:12,color:"#a78bfa"}}>+ ค่ากะดึก ฿{totalNightAll.toLocaleString()} ({nightCount} กะ)</span>}
+        </div>
+        <div style={{fontSize:12,color:"#475569",marginTop:4}}>{totalHours} ชม. · {filtered.length} รายการ</div>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        {[{l:"🌤 กะเช้า",p:dayPay,h:dayHrs,c:"#fbbf24",b:"#fbbf2433",s:`฿${rates.dayRate}/ชม.`},
+          {l:"🌙 กะดึก",p:nightPay,h:nightHrs,c:"#a78bfa",b:"#a78bfa33",s:`฿${rates.nightRate}/ชม.+฿${rates.nightAllowance}/กะ`}].map(s=>(
+          <div key={s.l} style={{background:"#0f172a",border:`1px solid ${s.b}`,borderRadius:14,padding:14}}>
+            <div style={{fontSize:12,color:s.c,fontWeight:600,marginBottom:6}}>{s.l}</div>
+            <div style={{fontSize:20,fontWeight:700}}>฿{s.p.toLocaleString("th-TH",{minimumFractionDigits:0})}</div>
+            <div style={{fontSize:11,color:s.c,marginTop:2,opacity:0.8}}>{s.s}</div>
+            <div style={{fontSize:11,color:"#64748b",marginTop:1}}>{s.h} ชม.</div>
+            <div style={{height:4,background:"#1e293b",borderRadius:2,marginTop:8,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${totalHours?(s.h/totalHours)*100:0}%`,background:s.c,borderRadius:2}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {period==="all"&&periods.length>0&&(
+        <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:16,padding:16}}>
+          <div style={{fontSize:12,fontWeight:600,color:"#94a3b8",marginBottom:12}}>สรุปแต่ละรอบตัดวิก (ตัดทุกวันที่ 15)</div>
+          {periods.map(p=>{
+            const pe=entries.filter(e=>getPeriodKey(e.date)===p.key);
+            const pot=pe.reduce((s,e)=>s+calcOT(e.hours,e.shift,e.isHoliday,rates),0);
+            const pnc=pe.filter(e=>e.shift==="night").length;
+            const pna=pnc*rates.nightAllowance;
+            return(
+              <div key={p.key} style={{padding:"10px 0",borderBottom:"1px solid #1e293b"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:600}}>รอบ {p.label}</div>
+                    <div style={{fontSize:11,color:"#64748b",marginTop:2}}>{pe.reduce((s,e)=>s+e.hours,0)} ชม. · {pe.length} รายการ</div>
+                  </div>
+                  <div style={{fontSize:17,fontWeight:700,color:"#60a5fa"}}>฿{(pot+pna).toLocaleString("th-TH",{minimumFractionDigits:0})}</div>
+                </div>
+                <div style={{display:"flex",gap:10,marginTop:5,fontSize:11}}>
+                  <span style={{color:"#64748b"}}>โอที ฿{pot.toLocaleString("th-TH",{minimumFractionDigits:0})}</span>
+                  {pna>0&&<span style={{color:"#a78bfa"}}>+ 🌙 ฿{pna.toLocaleString()} ({pnc} กะ)</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>)}
+
+    {/* LIST */}
+    {tab==="list"&&(
+      <div>
+        {byDate.map(([date,dayEnts])=>{
+          const dOT=dayEnts.reduce((s,e)=>s+calcOT(e.hours,e.shift,e.isHoliday,rates),0);
+          const dN=dayEnts.filter(e=>e.shift==="night").length*rates.nightAllowance;
+          const dT=dOT+dN;
+          const dH=dayEnts.reduce((s,e)=>s+e.hours,0);
+          const isHol=dayEnts.some(e=>e.isHoliday);
+          return(
+            <div key={date} style={{background:"#0f172a",border:`1px solid ${isHol?"#34d39933":"#1e293b"}`,borderRadius:16,padding:14,marginBottom:10}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:15,fontWeight:700}}>{fmtDate(date)}</div>
+                  {isHol
+                    ?<span style={{fontSize:10,background:"#0d3b2e",color:"#34d399",padding:"2px 8px",borderRadius:20,display:"inline-block",marginTop:3}}>🏖 วันหยุด</span>
+                    :<span style={{fontSize:10,background:"#1e3a5f",color:"#60a5fa",padding:"2px 8px",borderRadius:20,display:"inline-block",marginTop:3}}>📅 วันธรรมดา</span>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:10,color:"#64748b"}}>ยอดรวมวันนี้</div>
+                  <div style={{fontSize:20,fontWeight:700,color:"#60a5fa"}}>฿{dT.toLocaleString("th-TH",{minimumFractionDigits:0})}</div>
+                  {dH>0&&<div style={{fontSize:11,color:"#64748b"}}>{dH} ชม.</div>}
+                </div>
+              </div>
+              {[...dayEnts].sort((a,b)=>a.shift==="day"?-1:1).map(entry=>{
+                const op=calcOT(entry.hours,entry.shift,entry.isHoliday,rates);
+                const na=entry.shift==="night"?rates.nightAllowance:0;
+                const tot=op+na;
+                const sc=entry.shift==="day"?{l:"🌤 กะเช้า",c:"#fbbf24",bg:"rgba(45,32,0,0.33)"}:{l:"🌙 กะดึก",c:"#a78bfa",bg:"rgba(30,16,64,0.33)"};
+                return(
+                  <div key={entry.id} style={{background:"#0a0e1a",borderRadius:10,padding:"10px 12px",marginBottom:6}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div style={{flex:1}}>
+                        <span style={{fontSize:11,background:sc.bg,color:sc.c,padding:"2px 10px",borderRadius:20,fontWeight:600}}>{sc.l}</span>
+                        <div style={{fontSize:12,color:"#64748b",marginTop:5}}>{entry.hours>0?`⏱ ${entry.hours} ชม.`:"⏱ ไม่มีโอที"}</div>
+                        {entry.shift==="night"&&<div style={{fontSize:11,color:"#a78bfa",marginTop:2}}>🌙 ค่ากะ +฿{rates.nightAllowance}</div>}
+                      </div>
+                      <div style={{textAlign:"right",marginLeft:10}}>
+                        <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>฿{tot.toLocaleString("th-TH",{minimumFractionDigits:0})}</div>
+                        <div style={{display:"flex",gap:5}}>
+                          <button onClick={()=>{setForm({date:entry.date,shift:entry.shift,hours:entry.hours,isHoliday:entry.isHoliday});setEditId(entry.id);setShowForm(true);setTab("list");}}
+                            style={{background:"#1e3a5f",border:"none",color:"#60a5fa",padding:"4px 10px",borderRadius:7,fontSize:11}}>แก้ไข</button>
+                          <button onClick={()=>setDeleteId(entry.id)}
+                            style={{background:"#3b1a1a",border:"none",color:"#f87171",padding:"4px 10px",borderRadius:7,fontSize:11}}>ลบ</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {filtered.length===0&&<div style={{textAlign:"center",color:"#475569",padding:60,fontSize:14}}>ยังไม่มีรายการ<br/>กด "+ บันทึกโอที" เพื่อเพิ่ม</div>}
+      </div>
+    )}
+
+    {/* TABLE */}
+    {tab==="table"&&(
+      <div style={{background:"#0f172a",border:"1px solid #1e293b",borderRadius:16,overflow:"hidden"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1.6fr 2fr 0.8fr 1.5fr 1.2fr",background:"#0a0e1a",borderBottom:"2px solid #1e3a5f",padding:"10px 14px"}}>
+          {["วันที่","กะ","ชม.","ค่าโอที","ค่ากะ"].map((h,i)=>(
+            <div key={h} style={{fontSize:12,fontWeight:700,color:"#60a5fa",textAlign:i>=2?"right":"left"}}>{h}</div>
+          ))}
+        </div>
+        {[...filtered].sort((a,b)=>new Date(a.date)-new Date(b.date)).map((entry,idx)=>{
+          const op=calcOT(entry.hours,entry.shift,entry.isHoliday,rates);
+          const na=entry.shift==="night"?rates.nightAllowance:0;
+          const d=new Date(entry.date);
+          const sl=entry.shift==="day"?(entry.isHoliday?"เช้า (วันหยุด)":"เช้า"):(entry.isHoliday?"ดึก (วันหยุด)":"ดึก");
+          return(
+            <div key={entry.id} style={{display:"grid",gridTemplateColumns:"1.6fr 2fr 0.8fr 1.5fr 1.2fr",padding:"11px 14px",background:idx%2===0?"#0f172a":"#0d1424",borderBottom:"1px solid #1e293b22",alignItems:"center"}}>
+              <div style={{fontSize:14,fontWeight:600}}>{d.getDate()} {MONTHS_TH[d.getMonth()]}</div>
+              <div style={{fontSize:13,color:entry.shift==="night"?"#a78bfa":"#fbbf24"}}>{sl}</div>
+              <div style={{fontSize:14,fontWeight:600,textAlign:"right"}}>{entry.hours}</div>
+              <div style={{fontSize:13,color:op>0?"#e2e8f0":"#475569",textAlign:"right"}}>{op>0?op.toLocaleString("th-TH",{minimumFractionDigits:2}):"–"}</div>
+              <div style={{fontSize:13,color:na>0?"#a78bfa":"#475569",textAlign:"right"}}>{na>0?na:"–"}</div>
+            </div>
+          );
+        })}
+        {filtered.length>0&&(
+          <div style={{display:"grid",gridTemplateColumns:"1.6fr 2fr 0.8fr 1.5fr 1.2fr",padding:"12px 14px",background:"rgba(30,58,95,0.2)",borderTop:"2px solid #1e3a5f",alignItems:"center"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#60a5fa",gridColumn:"1/3"}}>รวมทั้งหมด</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#60a5fa",textAlign:"right"}}>{totalHours}</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#60a5fa",textAlign:"right"}}>{totalOT.toLocaleString("th-TH",{minimumFractionDigits:2})}</div>
+            <div style={{fontSize:13,fontWeight:700,color:"#a78bfa",textAlign:"right"}}>{totalNightAll.toLocaleString()}</div>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+
+  {/* DELETE MODAL */}
+  {deleteId&&(
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:24}}>
+      <div style={{background:"#0f172a",border:"1px solid #f8717144",borderRadius:16,padding:26,maxWidth:300,width:"100%"}}>
+        <div style={{fontSize:20,marginBottom:8}}>🗑️</div>
+        <div style={{fontSize:15,fontWeight:700,marginBottom:6}}>ยืนยันการลบ</div>
+        <div style={{fontSize:13,color:"#94a3b8",marginBottom:22}}>ต้องการลบรายการนี้ไหม?</div>
+        <div style={{display:"flex",gap:10}}>
+          <button onClick={()=>setDeleteId(null)} style={{flex:1,background:"#1e293b",border:"none",color:"#e2e8f0",padding:11,borderRadius:10,fontSize:13}}>ยกเลิก</button>
+          <button onClick={()=>{saveEntries(entries.filter(e=>e.id!==deleteId));setDeleteId(null);}} style={{flex:1,background:"#991b1b",border:"none",color:"#fff",padding:11,borderRadius:10,fontSize:13,fontWeight:700}}>ลบ</button>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+```
+
+);
+}
+
+ReactDOM.createRoot(document.getElementById(“root”)).render(<App/>);
+</script>
+
+</body>
+</html>
