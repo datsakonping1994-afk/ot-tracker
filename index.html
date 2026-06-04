@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="th">
 <head>
 <meta charset="UTF-8">
@@ -58,7 +57,6 @@ select option{background:#0f172a}
 </div>
 
 <!-- Settings -->
-
 <div class="settings-box hidden" id="settings-panel">
   <div class="settings-title">⚙️ ตั้งค่าอัตราโอที</div>
   <div class="settings-sub">ปรับได้เมื่อเงินเดือนขึ้น · ตัดวิกทุกวันที่ 15</div>
@@ -74,7 +72,6 @@ select option{background:#0f172a}
 </div>
 
 <!-- Tabs -->
-
 <div class="tab-row">
   <button class="tab-btn active" id="tab-summary" onclick="switchTab('summary')">📊 สรุปรอบ</button>
   <button class="tab-btn" id="tab-add" onclick="switchTab('add')">➕ บันทึก</button>
@@ -82,7 +79,6 @@ select option{background:#0f172a}
 </div>
 
 <!-- Summary -->
-
 <div id="view-summary">
   <div class="card">
     <div class="sub">รายได้รวม</div>
@@ -94,7 +90,6 @@ select option{background:#0f172a}
 </div>
 
 <!-- Add -->
-
 <div id="view-add" class="hidden">
   <div class="card">
     <label>วันที่</label>
@@ -126,7 +121,6 @@ select option{background:#0f172a}
 </div>
 
 <!-- List -->
-
 <div id="view-list" class="hidden">
   <div class="card">
     <table>
@@ -138,14 +132,24 @@ select option{background:#0f172a}
 
 <script>
 var M=["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
-var currentTab="summary",currentPeriod="all";
+var currentTab="summary",currentPeriod="current";
 var DEF={dayRate:121,nightRate:161,holidayRate:161,holidayOTRate:242,nightAllowance:265};
+
+function getCurrentPeriod(){
+  var today=new Date();
+  var day=today.getDate(),m=today.getMonth(),y=today.getFullYear();
+  if(day<=15)return y+"-"+String(m+1).padStart(2,"0");
+  var n=new Date(y,m+1,1);
+  return n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0");
+}
 
 function loadE(){try{var v=localStorage.getItem("ot2");return v?JSON.parse(v):[];}catch(e){return [];}}
 function saveE(e){try{localStorage.setItem("ot2",JSON.stringify(e));}catch(x){}}
 function loadR(){try{var v=localStorage.getItem("ot_rates2");return v?JSON.parse(v):DEF;}catch(e){return DEF;}}
 function saveR(r){try{localStorage.setItem("ot_rates2",JSON.stringify(r));}catch(e){}}
 
+// set current period on load
+currentPeriod = getCurrentPeriod();
 function getPK(date){
   var d=new Date(date),day=d.getDate(),m=d.getMonth(),y=d.getFullYear();
   if(day<=15)return y+"-"+String(m+1).padStart(2,"0");
@@ -246,6 +250,10 @@ function render(){
     periods.forEach(function(k){
       pillHtml+="<button class='period-btn "+(currentPeriod===k?"active":"")+"' onclick=\"setPeriod('"+k+"')\">"+getPillLabel(k)+"</button>";
     });
+    // if currentPeriod not in periods yet, still show it as active
+    if(currentPeriod!=="all"&&periods.indexOf(currentPeriod)===-1){
+      pillHtml="<button class='period-btn' onclick=\"setPeriod('all')\">ทั้งหมด</button>";
+    }
     document.getElementById("period-list").innerHTML=pillHtml;
 
     var bHtml="";
@@ -315,6 +323,5 @@ function delEntry(id){
 
 render();
 </script>
-
 </body>
 </html>
