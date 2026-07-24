@@ -275,25 +275,26 @@ function render(){
     }
     document.getElementById("period-breakdown").innerHTML=bHtml;
 
-    // รายการในหน้าสรุป
+    // รายการในหน้าสรุปแบบตาราง
     var listHtml="";
     if(filtered.length>0){
-      listHtml+="<div style='font-size:11px;color:#60a5fa;margin:14px 0 8px;font-weight:600'>รายการ</div>";
+      listHtml="<div class='card' style='padding:0;overflow:hidden;margin-top:4px'>"+
+        "<table><thead><tr>"+
+        "<th>วันที่</th><th>กะ</th><th>ชม.</th><th>ค่าโอที</th><th>ค่ากะ</th><th></th>"+
+        "</tr></thead><tbody>";
       filtered.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).forEach(function(e){
         var ot=calcOT(e.hours,e.shift,e.type);
         var na=e.shift==="night"?r.nightAllowance:0;
-        listHtml+="<div style='background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center'>"+
-          "<div>"+
-          "<div style='font-size:13px;font-weight:600'>"+fmtDate(e.date)+"</div>"+
-          "<div style='font-size:11px;margin-top:3px'>"+
-          "<span style='color:"+(e.shift==="day"?"#fbbf24":"#a78bfa")+"'>"+(e.shift==="day"?"🌤 เช้า":"🌙 ดึก")+"</span>"+
-          "<span style='color:#64748b;margin-left:6px'>"+(e.hours>0?e.hours+" ชม.":"ไม่มีโอที")+"</span>"+
-          (e.type==="holiday"?"<span style='color:#34d399;margin-left:4px'>วันหยุด</span>":"")+"</div></div>"+
-          "<div style='text-align:right'>"+
-          "<div style='font-size:15px;font-weight:700;color:#60a5fa'>฿"+(ot+na).toFixed(0)+"</div>"+
-          "<button style='background:#3b1a1a;border:none;color:#f87171;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;margin-top:4px' onclick='delEntry("+e.id+")'>ลบ</button>"+
-          "</div></div>";
+        listHtml+="<tr>"+
+          "<td>"+fmtDate(e.date)+"</td>"+
+          "<td class='"+e.shift+"'>"+(e.shift==="day"?"🌤":"🌙")+"</td>"+
+          "<td>"+e.hours+"</td>"+
+          "<td>"+(ot>0?"฿"+ot.toFixed(2):"–")+"</td>"+
+          "<td>"+(na>0?"฿"+na:"–")+"</td>"+
+          "<td><button class='btn-del' onclick='delEntry("+e.id+")'>ลบ</button></td>"+
+          "</tr>";
       });
+      listHtml+="</tbody></table></div>";
     }
     document.getElementById("entry-summary-list").innerHTML=listHtml;
   }
